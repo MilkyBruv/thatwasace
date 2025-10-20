@@ -1,0 +1,22 @@
+prediction - allows you to see further into the future of where the enemy bullet will go
+accuracy - chance to hit the head which is a one shot kill
+caliber - essentially just strength, increases bullet damage by the amount
+velocity - speed at which the bullet moves
+muzzle - NEGATIVE status where you lose 1 caliber and 1 velocity for the NEXT shots, not the current bullet that is 
+    already moving
+
+attack - damaging cards, ie shooting
+defence - defensive cards, ie blocking, deflecting, dodging
+status - applies a status (prediction, accuracy, etc)
+
+CARD IDEAS:
+spin - status - +1 caliber
+twin spin - status - +2 caliber
+dust kick - status - -1 accuracy to enemy
+just a pinch (of extra gunpowder) - status - +1 velocity
+just a dash (of even more extra gunpowder) - status - +2 velocity
+
+GAME IDEAS:
+paces - how many paces apart from the player and enemy, more paces means you'll want more velocity
+
+
