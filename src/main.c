@@ -1,22 +1,43 @@
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_ttf.h>
 #include <usrtypes.h>
 #include <stdio.h>
 
 #define CARD_WIDTH 98 
 #define CARD_HEIGHT 146
 
-#define FB_WIDTH 480
-#define FB_HEIGHT 320
+#define TOTAL_CARDS 3
+#define CARD_SCALE 2.0f
+
+#define FB_WIDTH (240 * 3)
+#define FB_HEIGHT (160 * 3)
 #define min(a, b) ((a) < (b) ? (a) : (b))
+
+typedef struct card
+{
+    ALLEGRO_BITMAP* bm;
+    ALLEGRO_BITMAP* overlay_bm;
+    u8 tint;
+    s32 cx, cy, x1, tl_x, tl_y, tr_x, tr_y, bl_x, bl_r, br_x, br_y; // rectangle positions (corners and center)
+    b8 follow, entered, got_offset;
+    s32 ox, oy;
+    u8 layer;
+} card_t;
 
 int main(int argc, char const *argv[])
 {
     al_init();
     al_init_image_addon();
+    al_init_font_addon();
+    al_init_ttf_addon();
     al_install_audio();
     al_install_mouse();
+    al_init_acodec_addon();
+
     al_set_new_display_flags(ALLEGRO_RESIZABLE);
     ALLEGRO_DISPLAY* display = al_create_display(800, 800);
     ALLEGRO_EVENT_QUEUE* event_queue = al_create_event_queue();
@@ -26,16 +47,37 @@ int main(int argc, char const *argv[])
     al_register_event_source(event_queue, al_get_timer_event_source(timer));
     al_register_event_source(event_queue, al_get_mouse_event_source());
 
-    ALLEGRO_BITMAP* bm = al_load_bitmap("./res/test_card.png");
+    // i have 1 whole font just for me
+    ALLEGRO_FONT* font = al_load_ttf_font("./res/font/carnevalee-freakshow/Carnevalee Freakshow.ttf", 32, ALLEGRO_TTF_MONOCHROME);
+
+    // i have 3 whole sounds just for me
+    al_reserve_samples(3);
+    ALLEGRO_SAMPLE* up_sample = al_load_sample("./res/up2.wav");
+    ALLEGRO_SAMPLE* down_sample = al_load_sample("./res/down2.wav");
+    ALLEGRO_SAMPLE* info_sample = al_load_sample("./res/info.wav");
+
     ALLEGRO_BITMAP* fb = al_create_bitmap(FB_WIDTH, FB_HEIGHT);
     f32 fb_scale = 1.0f;
     s32 fb_x = 0, fb_y = 0;
-    u8 tint = 0;
-
-    s32 x = 0, y = 0;
-    s32 ox = 0, oy = 0;
-    b8 follow = false, in_card = false, got_offset = false;
     s32 mx = 0, my = 0;
+    b8 in_card = false;
+
+    card_t cards[TOTAL_CARDS];
+    cards[0] = (card_t) {
+        .bm = al_load_bitmap("./res/card1.png"),
+        .overlay_bm = al_create_bitmap(CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE),
+        .x = 0, .y = 0, .ox = 0, .oy = 0, .entered = false, .follow = false, .got_offset = false, .tint = 128
+    };
+    cards[1] = (card_t) {
+        .bm = al_load_bitmap("./res/card2.png"),
+        .overlay_bm = al_create_bitmap(CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE),
+        .x = 100, .y = 0, .ox = 0, .oy = 0, .entered = false, .follow = false, .got_offset = false, .tint = 128
+    };
+    cards[2] = (card_t) {
+        .bm = al_load_bitmap("./res/card2.png"),
+        .overlay_bm = al_create_bitmap(CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE),
+        .x = 200, .y = 0, .ox = 0, .oy = 0, .entered = false, .follow = false, .got_offset = false, .tint = 128
+    };
     
     ALLEGRO_EVENT event;
     ALLEGRO_MOUSE_STATE mouse;
@@ -57,20 +99,48 @@ int main(int argc, char const *argv[])
             break;
 
         case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
-            if (mx >= x && mx <= x + CARD_WIDTH - 1 && my >= y && my <= y + CARD_HEIGHT - 1)
+            for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                follow = true;
-
-                if (!got_offset)
+                if (cards[i].entered)
                 {
-                    ox = mx - x;
-                    oy = my - y;
+                    if (event.mouse.button == 1)
+                    {
+                        cards[i].follow = true;
+                        cards[i].layer = TOTAL_CARDS - 1;
+
+                        // Move rest of cards down beneath
+                        for (size_t j = 0; j < TOTAL_CARDS; j++)
+                        {
+                            if (i != j && cards[j].layer - 1 >= 0)
+                            {
+                                cards[j].layer--;
+                            }
+                        }
+
+                        if (!cards[i].got_offset)
+                        {
+                            cards[i].ox = mx - cards[i].x;
+                            cards[i].oy = my - cards[i].y;
+                            al_play_sample(up_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
+                        }
+                    }
+                    else if (event.mouse.button == 2)
+                    {
+                        al_play_sample(info_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
+                    }
+                    break;
                 }
             }
+            
             break;
 
         case ALLEGRO_EVENT_MOUSE_BUTTON_UP:
-            follow = false;
+            if (event.mouse.button != 1) { break; }
+            for (size_t i = 0; i < TOTAL_CARDS; i++)
+            {
+                cards[i].follow = false;
+            }
+            al_play_sample(down_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
             break;
 
         case ALLEGRO_EVENT_TIMER:
@@ -78,27 +148,42 @@ int main(int argc, char const *argv[])
             mx = (f32) (mouse.x - fb_x) / fb_scale;
             my = (f32) (mouse.y - fb_y) / fb_scale;
 
-            if (follow)
+            for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                // follow mouse
-                x = mx - ox;
-                y = my - oy;
+                if (cards[i].follow)
+                {
+                    // follow mouse
+                    cards[i].x = mx - cards[i].ox;
+                    cards[i].y = my - cards[i].oy;
 
-                tint = 255;
+                    cards[i].tint = 255;
+                }
+
+                if (mx >= cards[i].x && mx <= cards[i].x + (CARD_WIDTH * CARD_SCALE) - 1 && 
+                    my >= cards[i].y && my <= cards[i].y + (CARD_HEIGHT * CARD_SCALE) - 1)
+                {
+                    cards[i].entered = true;
+                    in_card = true;
+                    al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_MOVE);
+                    if (!cards[i].follow) cards[i].tint = 182;
+                }
+                else
+                {
+                    cards[i].entered = false;
+                    al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
+                    cards[i].tint = 128;
+                }
             }
 
-            if (mx >= x && mx <= x + CARD_WIDTH - 1 && my >= y && my <= y + CARD_HEIGHT - 1)
+            for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                in_card = true;
-                al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_MOVE);
-                tint = 182;
+                if (cards[i].entered)
+                {
+                    // al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_MOVE);
+                    // al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
+                }
             }
-            else
-            {
-                in_card = false;
-                al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
-                tint = 128;
-            }
+            
 
             redraw = true;
             break;
@@ -109,16 +194,29 @@ int main(int argc, char const *argv[])
             al_clear_to_color(al_map_rgb(0, 0, 0));
             
             al_set_target_bitmap(fb);
-            al_clear_to_color(al_map_rgb(0, 0, 128));
+            al_clear_to_color(al_map_rgb(72, 0, 255));
 
-            if (follow && in_card)
+            for (size_t l = 0; l < max_layer; l++)
             {
-                al_draw_tinted_scaled_bitmap(bm, al_map_rgb(tint, tint, tint), 0, 0, CARD_WIDTH, CARD_HEIGHT,
-                    x - 4, y - 4, CARD_WIDTH + 8, CARD_HEIGHT + 8, 0);
-            }
-            else
-            {
-                al_draw_tinted_bitmap(bm, al_map_rgb(tint, tint, tint), x, y, 0);
+                for (size_t i = 0; i < TOTAL_CARDS; i++)
+                {
+                    // if (cards[i].layer != l) { continue; }
+                    if (cards[i].follow && cards[i].entered)
+                    {
+                        al_draw_tinted_scaled_bitmap(cards[i].bm, al_map_rgb(cards[i].tint, cards[i].tint, cards[i].tint), 
+                            0, 0, CARD_WIDTH, CARD_HEIGHT,
+                            cards[i].x - 4, cards[i].y - 4, (CARD_WIDTH * CARD_SCALE) + 8, (CARD_HEIGHT * CARD_SCALE) + 8, 0);
+                    }
+                    else
+                    {
+                        al_draw_tinted_scaled_bitmap(cards[i].bm, al_map_rgb(cards[i].tint, cards[i].tint, cards[i].tint), 
+                            0, 0, CARD_WIDTH, CARD_HEIGHT,
+                            cards[i].x, cards[i].y, CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE, 0);
+                    }
+
+                    al_draw_multiline_textf(font, al_map_rgb(cards[i].tint, cards[i].tint, cards[i].tint), 
+                        cards[i].x + 16, cards[i].y + ((CARD_HEIGHT * CARD_SCALE) / 2) + 16, CARD_WIDTH, 32, 0, "%d, %d", cards[i].x, cards[i].y);
+                }
             }
 
             al_set_target_bitmap(al_get_backbuffer(display));
@@ -138,16 +236,23 @@ int main(int argc, char const *argv[])
     }
     al_stop_timer(timer);
 
+    al_destroy_sample(up_sample);
+    al_destroy_sample(down_sample);
+    al_destroy_sample(info_sample);
     al_destroy_bitmap(fb);
-    al_destroy_bitmap(bm);
+    al_destroy_bitmap(cards[0].bm);
+    al_destroy_bitmap(cards[1].bm);
+    al_destroy_font(font);
     al_unregister_event_source(event_queue, al_get_mouse_event_source());
     al_unregister_event_source(event_queue, al_get_timer_event_source(timer));
     al_unregister_event_source(event_queue, al_get_display_event_source(display));
-    al_uninstall_audio();
-    al_uninstall_mouse();
     al_destroy_timer(timer);
     al_destroy_event_queue(event_queue);
     al_destroy_display(display);
+    al_uninstall_audio();
+    al_uninstall_mouse();
+    al_shutdown_ttf_addon();
+    al_shutdown_font_addon();
     al_shutdown_image_addon();
 
     return 0;

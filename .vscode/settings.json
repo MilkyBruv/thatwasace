@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "usrtypes.h": "c"
+        "usrtypes.h": "c",
+        "allegro.h": "c",
+        "random": "c"
     }
 }
