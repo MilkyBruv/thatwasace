@@ -4,13 +4,14 @@
 #include <allegro5/allegro_acodec.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_ttf.h>
+#include <math.h>
 #include <usrtypes.h>
 #include <stdio.h>
 
 #define CARD_WIDTH 98 
 #define CARD_HEIGHT 146
 
-#define TOTAL_CARDS 3
+#define TOTAL_CARDS 1
 #define CARD_SCALE 2.0f
 
 #define FB_WIDTH (240 * 3)
@@ -22,11 +23,11 @@ typedef struct card
     ALLEGRO_BITMAP* bm;
     ALLEGRO_BITMAP* overlay_bm;
     u8 tint;
-    s32 cx, cy, x1, tl_x, tl_y, tr_x, tr_y, bl_x, bl_r, br_x, br_y; // rectangle positions (corners and center)
+    s32 cx, cy, x1, tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y; // rectangle positions (corners and center)
     b8 follow, entered, got_offset;
-    s32 ox, oy;
-    u8 layer;
 } card_t;
+
+card_t create_card(const char* bm_path, s32 x, s32 y);
 
 int main(int argc, char const *argv[])
 {
@@ -63,22 +64,10 @@ int main(int argc, char const *argv[])
     b8 in_card = false;
 
     card_t cards[TOTAL_CARDS];
-    cards[0] = (card_t) {
-        .bm = al_load_bitmap("./res/card1.png"),
-        .overlay_bm = al_create_bitmap(CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE),
-        .x = 0, .y = 0, .ox = 0, .oy = 0, .entered = false, .follow = false, .got_offset = false, .tint = 128
-    };
-    cards[1] = (card_t) {
-        .bm = al_load_bitmap("./res/card2.png"),
-        .overlay_bm = al_create_bitmap(CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE),
-        .x = 100, .y = 0, .ox = 0, .oy = 0, .entered = false, .follow = false, .got_offset = false, .tint = 128
-    };
-    cards[2] = (card_t) {
-        .bm = al_load_bitmap("./res/card2.png"),
-        .overlay_bm = al_create_bitmap(CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE),
-        .x = 200, .y = 0, .ox = 0, .oy = 0, .entered = false, .follow = false, .got_offset = false, .tint = 128
-    };
-    
+    cards[0] = create_card("./res/card1.png", FB_WIDTH / 2, FB_HEIGHT / 2);
+    // cards[1] = create_card("./res/card2.png", 200, 200);
+    f32 angle = 0.0f;
+
     ALLEGRO_EVENT event;
     ALLEGRO_MOUSE_STATE mouse;
     b8 running = true, redraw = false;
@@ -99,37 +88,28 @@ int main(int argc, char const *argv[])
             break;
 
         case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
+            angle += M_PI / 16;
             for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                if (cards[i].entered)
-                {
-                    if (event.mouse.button == 1)
-                    {
-                        cards[i].follow = true;
-                        cards[i].layer = TOTAL_CARDS - 1;
+                // if (cards[i].entered)
+                // {
+                //     if (event.mouse.button == 1)
+                //     {
+                //         cards[i].follow = true;
 
-                        // Move rest of cards down beneath
-                        for (size_t j = 0; j < TOTAL_CARDS; j++)
-                        {
-                            if (i != j && cards[j].layer - 1 >= 0)
-                            {
-                                cards[j].layer--;
-                            }
-                        }
-
-                        if (!cards[i].got_offset)
-                        {
-                            cards[i].ox = mx - cards[i].x;
-                            cards[i].oy = my - cards[i].y;
-                            al_play_sample(up_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
-                        }
-                    }
-                    else if (event.mouse.button == 2)
-                    {
-                        al_play_sample(info_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
-                    }
-                    break;
-                }
+                //         if (!cards[i].got_offset)
+                //         {
+                            // cards[i].cx = mx;
+                            // cards[i].cy = my;
+                //             al_play_sample(up_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
+                //         }
+                //     }
+                //     else if (event.mouse.button == 2)
+                //     {
+                //         al_play_sample(info_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
+                //     }
+                //     break;
+                // }
             }
             
             break;
@@ -150,40 +130,8 @@ int main(int argc, char const *argv[])
 
             for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                if (cards[i].follow)
-                {
-                    // follow mouse
-                    cards[i].x = mx - cards[i].ox;
-                    cards[i].y = my - cards[i].oy;
-
-                    cards[i].tint = 255;
-                }
-
-                if (mx >= cards[i].x && mx <= cards[i].x + (CARD_WIDTH * CARD_SCALE) - 1 && 
-                    my >= cards[i].y && my <= cards[i].y + (CARD_HEIGHT * CARD_SCALE) - 1)
-                {
-                    cards[i].entered = true;
-                    in_card = true;
-                    al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_MOVE);
-                    if (!cards[i].follow) cards[i].tint = 182;
-                }
-                else
-                {
-                    cards[i].entered = false;
-                    al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
-                    cards[i].tint = 128;
-                }
+                // 
             }
-
-            for (size_t i = 0; i < TOTAL_CARDS; i++)
-            {
-                if (cards[i].entered)
-                {
-                    // al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_MOVE);
-                    // al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
-                }
-            }
-            
 
             redraw = true;
             break;
@@ -196,27 +144,18 @@ int main(int argc, char const *argv[])
             al_set_target_bitmap(fb);
             al_clear_to_color(al_map_rgb(72, 0, 255));
 
-            for (size_t l = 0; l < max_layer; l++)
+            for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                for (size_t i = 0; i < TOTAL_CARDS; i++)
-                {
-                    // if (cards[i].layer != l) { continue; }
-                    if (cards[i].follow && cards[i].entered)
-                    {
-                        al_draw_tinted_scaled_bitmap(cards[i].bm, al_map_rgb(cards[i].tint, cards[i].tint, cards[i].tint), 
-                            0, 0, CARD_WIDTH, CARD_HEIGHT,
-                            cards[i].x - 4, cards[i].y - 4, (CARD_WIDTH * CARD_SCALE) + 8, (CARD_HEIGHT * CARD_SCALE) + 8, 0);
-                    }
-                    else
-                    {
-                        al_draw_tinted_scaled_bitmap(cards[i].bm, al_map_rgb(cards[i].tint, cards[i].tint, cards[i].tint), 
-                            0, 0, CARD_WIDTH, CARD_HEIGHT,
-                            cards[i].x, cards[i].y, CARD_WIDTH * CARD_SCALE, CARD_HEIGHT * CARD_SCALE, 0);
-                    }
+                // al_draw_tinted_scaled_rotated_bitmap(cards[i].bm, al_map_rgb(255, 255, 255),
+                //     cards[i].cx, cards[i].cy, 
+                //     cards[i].tl_x + CARD_WIDTH, cards[i].tl_y + CARD_HEIGHT, 
+                //     CARD_SCALE, CARD_SCALE, angle, 0);
 
-                    al_draw_multiline_textf(font, al_map_rgb(cards[i].tint, cards[i].tint, cards[i].tint), 
-                        cards[i].x + 16, cards[i].y + ((CARD_HEIGHT * CARD_SCALE) / 2) + 16, CARD_WIDTH, 32, 0, "%d, %d", cards[i].x, cards[i].y);
-                }
+                al_draw_rotated_bitmap(cards[i].bm,
+                    CARD_WIDTH / 2, CARD_HEIGHT / 2, 
+                    cards[i].tl_x, cards[i].tl_y, angle, 0);
+
+                al_draw_pixel(cards[i].cx, cards[i].cy, al_map_rgb(255, 0, 0));
             }
 
             al_set_target_bitmap(al_get_backbuffer(display));
@@ -241,7 +180,7 @@ int main(int argc, char const *argv[])
     al_destroy_sample(info_sample);
     al_destroy_bitmap(fb);
     al_destroy_bitmap(cards[0].bm);
-    al_destroy_bitmap(cards[1].bm);
+    // al_destroy_bitmap(cards[1].bm);
     al_destroy_font(font);
     al_unregister_event_source(event_queue, al_get_mouse_event_source());
     al_unregister_event_source(event_queue, al_get_timer_event_source(timer));
@@ -256,4 +195,17 @@ int main(int argc, char const *argv[])
     al_shutdown_image_addon();
 
     return 0;
+}
+
+card_t create_card(const char *bm_path, s32 x, s32 y)
+{
+    card_t new_card = {
+        .bm = al_load_bitmap(bm_path), .cx = x, .cy = y, .entered = false, .got_offset = false, .follow = false,
+        .tl_x = x - (CARD_WIDTH / 2), .tl_y = y - (CARD_HEIGHT / 2),
+        .tr_x = x + (CARD_WIDTH / 2), .tr_y = y - (CARD_HEIGHT / 2),
+        .bl_x = x - (CARD_WIDTH / 2), .bl_y = y + (CARD_HEIGHT / 2),
+        .br_x = x + (CARD_WIDTH / 2), .br_y = y + (CARD_HEIGHT / 2),
+    };
+
+    return new_card;
 }
