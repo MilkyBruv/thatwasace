@@ -11,6 +11,7 @@
 
 #define CARD_WIDTH 98 
 #define CARD_HEIGHT 146
+#define MAX_CARDS 7
 
 // #define TOTAL_CARDS 6
 #define CARD_SCALE 2.0f
@@ -26,7 +27,7 @@ typedef struct card
     ALLEGRO_BITMAP* bm;
     ALLEGRO_BITMAP* overlay_bm;
     u8 tint;
-    s32 cx, cy, x1, tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y; // rectangle positions (corners and center)
+    s32 cx, cy, x1, tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y; // rect positions (corners and center)
     b8 follow, entered, got_offset;
     f32 angle;
 } card_t;
@@ -36,7 +37,16 @@ void sort_cards(card_t cards[]);
 void rotate_point(s32* x, s32* y, s32 cx, s32 cy, f32 angle);
 b8 lines_hit(s32 x1, s32 y1, s32 x2, s32 y2, s32 x3, s32 y3, s32 x4, s32 y4);
 
-u32 TOTAL_CARDS = 6;
+b8 up_hits_top(s32 mx, s32 my, card_t card);
+b8 down_hits_top(s32 mx, s32 my, card_t card);
+b8 up_hits_bottom(s32 mx, s32 my, card_t card);
+b8 down_hits_bottom(s32 mx, s32 my, card_t card);
+b8 up_hits_left(s32 mx, s32 my, card_t card);
+b8 down_hits_left(s32 mx, s32 my, card_t card);
+b8 up_hits_right(s32 mx, s32 my, card_t card);
+b8 down_hits_right(s32 mx, s32 my, card_t card);
+
+u32 TOTAL_CARDS = 1;
 
 int main(int argc, char const *argv[])
 {
@@ -73,15 +83,15 @@ int main(int argc, char const *argv[])
     s32 mx = 0, my = 0;
     b8 in_card = false;
 
-    card_t cards[32];
+    card_t cards[MAX_CARDS];
     ALLEGRO_BITMAP* bm1 = al_load_bitmap("./res/card1.png");
     ALLEGRO_BITMAP* bm2 = al_load_bitmap("./res/card2.png");
-    cards[0] = create_card(bm1, 0, 0);
-    cards[1] = create_card(bm1, 0, 0);
-    cards[2] = create_card(bm1, 0, 0);
-    cards[3] = create_card(bm1, 0, 0);
-    cards[4] = create_card(bm1, 0, 0);
-    cards[5] = create_card(bm1, 0, 0);
+
+    for (size_t i = 0; i < MAX_CARDS; i++)
+    {
+        cards[i] = create_card(bm1, 0, 0);
+    }
+    
     f32 angle = 0.0f;
     sort_cards(cards);
 
@@ -105,27 +115,17 @@ int main(int argc, char const *argv[])
             break;
 
         case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
-            for (size_t i = 0; i < TOTAL_CARDS; i++)
+            if (event.mouse.button == 1)
             {
-                // if (cards[i].entered)
-                // {
-                //     if (event.mouse.button == 1)
-                //     {
-                //         cards[i].follow = true;
-
-                //         if (!cards[i].got_offset)
-                //         {
-                            // cards[i].cx = mx;
-                            // cards[i].cy = my;
-                //             al_play_sample(up_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
-                //         }
-                //     }
-                //     else if (event.mouse.button == 2)
-                //     {
-                //         al_play_sample(info_sample, 1.0f, 0.0f, 1.0f, ALLEGRO_PLAYMODE_ONCE, NULL);
-                //     }
-                //     break;
-                // }
+                TOTAL_CARDS = TOTAL_CARDS == MAX_CARDS ? MAX_CARDS : TOTAL_CARDS + 1;
+                printf("cards: %d\n", TOTAL_CARDS);
+                sort_cards(cards);
+            }
+            else if (event.mouse.button == 2)
+            {
+                TOTAL_CARDS = TOTAL_CARDS == 1 ? 1 : TOTAL_CARDS - 1;
+                printf("cards: %d\n", TOTAL_CARDS);
+                sort_cards(cards);
             }
             
             break;
@@ -144,9 +144,46 @@ int main(int argc, char const *argv[])
             mx = (f32) (mouse.x - fb_x) / fb_scale;
             my = (f32) (mouse.y - fb_y) / fb_scale;
 
-            for (size_t i = TOTAL_CARDS - 1; i > -1; i--)
+            // check if mouse in card
+            for (size_t i = TOTAL_CARDS - 1; i != -1; i--)
             {
-                // if ()
+                if (cards[i].angle == 0.0f) // one card / center card if odd number of cards
+                {
+                    if (up_hits_top(mx, my, cards[i]) && down_hits_bottom(mx, my, cards[i]))
+                    { 
+                        cards[i].entered = true;
+                        break;
+                    }
+                    else { cards[i].entered = false; }
+                }
+
+                else if (cards[i].angle < 0.0f) // rotated left
+                {
+                    if (up_hits_top(mx, my, cards[i]) || up_hits_right(mx, my, cards[i]))
+                    {
+                        if (down_hits_left(mx, my, cards[i]) || down_hits_bottom(mx, my, cards[i]))
+                        {
+                            cards[i].entered = true;
+                            break;
+                        }
+                        else { cards[i].entered = false; }
+                    }
+                    else { cards[i].entered = false; }
+                }
+
+                else if (cards[i].angle > 0.0f) // rotated right
+                {
+                    if (up_hits_top(mx, my, cards[i]) || up_hits_left(mx, my, cards[i]))
+                    {
+                        if (down_hits_right(mx, my, cards[i]) || down_hits_bottom(mx, my, cards[i]))
+                        {
+                            cards[i].entered = true;
+                            break;
+                        }
+                        else { cards[i].entered = false; }
+                    }
+                    else { cards[i].entered = false; }
+                }
             }
 
             redraw = true;
@@ -162,17 +199,21 @@ int main(int argc, char const *argv[])
 
             for (size_t i = 0; i < TOTAL_CARDS; i++)
             {
-                // al_draw_tinted_scaled_rotated_bitmap(cards[i].bm, al_map_rgb(255, 255, 255), 
-                //     cards[i].cx, cards[i].cy, 
-                //     cards[i].tl_x + CARD_WIDTH, cards[i].tl_y + CARD_HEIGHT, 
-                //     CARD_SCALE, CARD_SCALE, angle, 0);
+                if (cards[i].entered)
+                {
+                    al_draw_line(cards[i].tl_x, cards[i].tl_y, cards[i].tr_x, cards[i].tr_y, al_map_rgb(255, 255, 255), 8);
+                    al_draw_line(cards[i].tr_x, cards[i].tr_y, cards[i].br_x, cards[i].br_y, al_map_rgb(255, 255, 255), 8);
+                    al_draw_line(cards[i].br_x, cards[i].br_y, cards[i].bl_x, cards[i].bl_y, al_map_rgb(255, 255, 255), 8);
+                    al_draw_line(cards[i].bl_x, cards[i].bl_y, cards[i].tl_x, cards[i].tl_y, al_map_rgb(255, 255, 255), 8);
+                }
 
-                al_draw_rotated_bitmap(cards[i].bm,
-                    CARD_WIDTH / 2, CARD_HEIGHT / 2, 
-                    cards[i].cx, cards[i].cy, cards[i].angle, 0);
+                al_draw_rotated_bitmap(cards[i].bm, CARD_WIDTH / 2, CARD_HEIGHT / 2, cards[i].cx, cards[i].cy, 
+                    cards[i].angle, 0);
+
                 al_draw_textf(font, al_map_rgb(255, 255, 255), 8, 8, 0, "%f", angle);
 
-                al_draw_line(FB_WIDTH / 2, 0, FB_WIDTH / 2, FB_HEIGHT, al_map_rgb(255, 255, 255), 3);
+                al_draw_line(mx, my, mx, 0, al_map_rgb(255, 0, 0), 1);
+                al_draw_line(mx, my, mx, FB_HEIGHT, al_map_rgb(255, 0, 0), 1);
             }
 
             al_draw_pixel(FB_WIDTH / 2, FB_HEIGHT / 2, al_map_rgb(255, 255, 255));
@@ -261,14 +302,47 @@ void sort_cards(card_t cards[])
             
         }
     }
+    else if (TOTAL_CARDS != 1)// if number of cards is odd and is not just 1 card
+    {
+        // center
+        cards[(TOTAL_CARDS - 1) / 2].cy = 400;
+
+        // to the left
+        for (size_t i = ((TOTAL_CARDS - 1) / 2) - 1; i != -1; i--)
+        {
+            cards[i].cy = y_increment + 400;
+            printf("left (%lld): %d\n", i, y_increment);
+            y_increment += y_increment + 5;
+        }
+
+        // to the right
+        y_increment = 5;
+
+        for (size_t i = ((TOTAL_CARDS - 1) / 2) + 1; i < TOTAL_CARDS; i++)
+        {
+            cards[i].cy = y_increment + 400;
+            printf("right (%lld): %d\n", i, y_increment);
+            y_increment += y_increment + 5;
+            
+        }
+    }
+    else
+    {
+        cards[0].cx = FB_WIDTH / 2;
+        cards[0].cy = 400;
+        cards[0].tl_x = cards[0].cx - (CARD_WIDTH / 2); cards[0].tl_y = cards[0].cy - (CARD_HEIGHT / 2);
+        cards[0].tr_x = cards[0].cx + (CARD_WIDTH / 2); cards[0].tr_y = cards[0].cy - (CARD_HEIGHT / 2);
+        cards[0].bl_x = cards[0].cx - (CARD_WIDTH / 2); cards[0].bl_y = cards[0].cy + (CARD_HEIGHT / 2);
+        cards[0].br_x = cards[0].cx + (CARD_WIDTH / 2); cards[0].br_y = cards[0].cy + (CARD_HEIGHT / 2);
+        cards[0].angle = 0.0f;
+        return;
+    }
     
     // apply angle
     for (size_t i = 0; i < TOTAL_CARDS; i++)
     {
         cards[i].angle = angle;
         cards[i].cx = x;
-        angle += angle_increment;
-        x += x_increment;
 
         // set card corners
         cards[i].tl_x = cards[i].cx - (CARD_WIDTH / 2); cards[i].tl_y = cards[i].cy - (CARD_HEIGHT / 2);
@@ -276,6 +350,13 @@ void sort_cards(card_t cards[])
         cards[i].bl_x = cards[i].cx - (CARD_WIDTH / 2); cards[i].bl_y = cards[i].cy + (CARD_HEIGHT / 2);
         cards[i].br_x = cards[i].cx + (CARD_WIDTH / 2); cards[i].br_y = cards[i].cy + (CARD_HEIGHT / 2);
 
+        rotate_point(&cards[i].tl_x, &cards[i].tl_y, cards[i].cx, cards[i].cy, angle);
+        rotate_point(&cards[i].tr_x, &cards[i].tr_y, cards[i].cx, cards[i].cy, angle);
+        rotate_point(&cards[i].bl_x, &cards[i].bl_y, cards[i].cx, cards[i].cy, angle);
+        rotate_point(&cards[i].br_x, &cards[i].br_y, cards[i].cx, cards[i].cy, angle);
+
+        angle += angle_increment;
+        x += x_increment;
     }
 }
 
@@ -309,4 +390,44 @@ b8 lines_hit(s32 x1, s32 y1, s32 x2, s32 y2, s32 x3, s32 y3, s32 x4, s32 y4)
     f32 s = num2 / den;
 
     return (r >= 0.0f && r <= 1.0f) && (s >= 0.0f && s <= 1.0f);
+}
+
+b8 up_hits_top(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, 0, card.tl_x, card.tl_y, card.tr_x, card.tr_y);
+}
+
+b8 up_hits_bottom(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, 0, card.bl_x, card.bl_y, card.br_x, card.br_y);
+}
+
+b8 up_hits_left(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, 0, card.bl_x, card.bl_y, card.tl_x, card.tl_y);
+}
+
+b8 up_hits_right(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, 0, card.tr_x, card.tr_y, card.br_x, card.br_y);
+}
+
+b8 down_hits_top(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, FB_HEIGHT + 50, card.tl_x, card.tl_y, card.tr_x, card.tr_y);
+}
+
+b8 down_hits_bottom(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, FB_HEIGHT + 50, card.bl_x, card.bl_y, card.br_x, card.br_y);
+}
+
+b8 down_hits_left(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, FB_HEIGHT + 50, card.bl_x, card.bl_y, card.tl_x, card.tl_y);
+}
+
+b8 down_hits_right(s32 mx, s32 my, card_t card)
+{
+    return lines_hit(mx, my, mx, FB_HEIGHT + 50, card.tr_x, card.tr_y, card.br_x, card.br_y);
 }

@@ -2,6 +2,7 @@
     "files.associations": {
         "usrtypes.h": "c",
         "allegro.h": "c",
-        "random": "c"
+        "random": "c",
+        "math.h": "c"
     }
 }
